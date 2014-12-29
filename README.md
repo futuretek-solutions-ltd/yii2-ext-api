@@ -67,19 +67,9 @@ where the attribute can be one of following:
 
 **validate** - Specifies validator function to check parameter value against
 
+Validator must be static method name from the Validate class. 
 * isInt
 * isString
-* Class::method()
-
-**required** - If the parameter is required
-
-* true / 1
-* false / 0
-
-**null** - If the parameter can be null
-
-* true / 1
-* false / 0
 
 **element** - Array element definition. If @param is of type Array, you can describe array elements with this attribute 
 
@@ -91,14 +81,14 @@ Usage: `@return type description`
 
 Indicate method return value. If the return value is an array, you can define it by using [], eg. String[]
 
-**Remember:** API function should always return associative array. If another type is returned, it will be treated like the function has no output.
+**Remember:** API function should always (and I mean ALWAYS!) return associative array. If another type is returned, it will be treated like the function has no output.
 Additionaly if the function returns boolean false (or another data type that can be typed to false), the API call will result in general error message.
   
 If you want to express processing fail inside the method, you can use $this->setError() or $this->setWarning().
 
-###@return-element
+###@return-param
 
-Usage: `@return-element type name description`
+Usage: `@return-param type name description`
 
 All API methods must return Array, bool or void(null). In case of Array you can specify each array element with this tag.
 This is mainly to describe the method. No additional logic is bind to this tag.  
@@ -120,7 +110,6 @@ Indicates that this method will be publicly accessible without user identificati
 Usage: `@permission permissionName`
 
 Require specified RBAC permission to run action. If @no-auth is used, this tag will be ignored 
-
 
 ###@transaction
 
