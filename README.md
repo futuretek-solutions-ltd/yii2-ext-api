@@ -49,6 +49,26 @@ public function getHello($name)
 }
 ```
 
+Optionaly use IpFilter to limit access to API. Declare it in the `behaviors()` method of your controller class.
+ 
+```php
+public function behaviors()
+{
+    return [
+        'ips' => [
+            'class' => \futuretek\api\IpFilter::className(),
+            'policy' => IpFilter::POLICY_ALLOW_ALL,
+            'list' => [
+                '192.168.1.2',
+                '192.168.11.1-192.168.11.27',
+                '10.*.*.*',
+                '172.16.1.0/24',
+            ],
+        ],
+    ];
+}
+```
+
 ##Allowed phpDoc tags
 
 ###@param
