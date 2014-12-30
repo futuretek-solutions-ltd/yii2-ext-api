@@ -18,7 +18,17 @@ Use composer and add the following line to your composer.json file:
 
 ##Usage
 
-Define the custom action in your controller:
+Setup the API in the init method of your controller:
+
+```php
+	public function init()
+	{
+		$this->setIdentity(UserModel);
+		parent::init();
+	}
+```
+
+Define the custom actions:
 
 ```php
 public function actions()
@@ -68,6 +78,22 @@ public function behaviors()
     ];
 }
 ```
+
+##Built-in methods
+
+###ping
+
+Ping action intended mainly to test the API interface availability
+
+###generate-definition
+
+Generate API methods definition list
+
+This is the default action if API method is not specified
+
+###generate-confluence-documentation
+
+Generate API documentation in Confluence markup
 
 ##Allowed phpDoc tags
 
