@@ -218,7 +218,9 @@ abstract class ApiController extends Controller
                 if (isset($param['validate']) && $param['validate']) { //Validator is set
                     if (method_exists('\futuretek\shared\Validate', $param['validate'])) { // Validator method exists
                         $validator = $param['validate'];
-                        if (!Validate::$validator($this->_inputVars[$paramName])) { //Input param not valid
+                        if (Validate::$validator($this->_inputVars[$paramName])) { //Input param valid
+                            $this->actionParams[$paramName] = $this->_inputVars[$paramName];
+                        } else {
                             $this->setError(
                                 Yii::t(
                                     'api',
@@ -234,6 +236,8 @@ abstract class ApiController extends Controller
                             'VALIDATOR_NOT_FOUND'
                         );
                     }
+                } else {
+                    $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                 }
             } else {
                 $this->setError(Yii::t('api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
@@ -246,6 +250,64 @@ abstract class ApiController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Runs an action within this controller with the specified action ID and parameters.
+     * If the action ID is empty, the method will use [[defaultAction]].
+     * @param string $id the ID of the action to be executed.
+     * @param array $params the parameters (name-value pairs) to be passed to the action.
+     * @return mixed the result of the action.
+     * @throws InvalidRouteException if the requested action ID cannot be resolved into an action successfully.
+     * @see createAction()
+     */
+    public function runAction($id, $params = [])
+    {
+        $action = $this->createAction($id);
+        if ($action === null) {
+            throw new InvalidRouteException('Unable to resolve the request: ' . $this->getUniqueId() . '/' . $id);
+        }
+
+        Yii::trace("Route to run: " . $action->getUniqueId(), __METHOD__);
+
+        if (Yii::$app->requestedAction === null) {
+            Yii::$app->requestedAction = $action;
+        }
+
+        $oldAction = $this->action;
+        $this->action = $action;
+
+        $modules = [];
+        $runAction = true;
+
+        // call beforeAction on modules
+        foreach ($this->getModules() as $module) {
+            if ($module->beforeAction($action)) {
+                array_unshift($modules, $module);
+            } else {
+                $runAction = false;
+                break;
+            }
+        }
+
+        $result = null;
+
+        if ($runAction && $this->beforeAction($action)) {
+            // run the action
+            $result = $action->runWithParams(array_merge($params, $this->actionParams));
+
+            $result = $this->afterAction($action, $result);
+
+            // call afterAction on modules
+            foreach ($modules as $module) {
+                /* @var $module Module */
+                $result = $module->afterAction($action, $result);
+            }
+        }
+
+        $this->action = $oldAction;
+
+        return $result;
     }
 
     /**
@@ -345,12 +407,16 @@ abstract class ApiController extends Controller
         $result['params'] = [];
         $params = $method->getParameters();
         $n = preg_match_all('/^@param\s+([\w\.\\\]+(\[\s*\])?)\s*?(\$[\w\.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
-        if ($n > count($params)) {
-            $n = count($params);
+        if ($n != count($params)) {
+            $this->setError(Yii::t('api', 'Params count of the method {method} differs from phpDoc params count', ['method' => $method->getShortName()]), 'PARAM_COUNT_MISMATCH');
         }
 
         for ($i = 0; $i < $n; ++$i) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1][$i]);
+
+            if (!in_array('$' . $params[$i]->getName(), $matches[3])) {
+                $this->setError(Yii::t('api', 'Documented param {param} not found in the method {method} definition', ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]), 'PARAM_COUNT_MISMATCH');
+            }
 
             $result['params'][$params[$i]->getName()] = [
                 'type' => $type,
