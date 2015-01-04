@@ -9,10 +9,11 @@ use yii\base\Action;
 use yii\base\ErrorException;
 use yii\base\InlineAction;
 use yii\base\InvalidParamException;
+use yii\base\InvalidRouteException;
+use yii\base\Module;
 use yii\helpers\Json;
 use yii\log\Logger;
 use yii\web\Controller;
-use yii\web\IdentityInterface;
 
 /**
  * Class ApiController
@@ -33,11 +34,6 @@ abstract class ApiController extends Controller
      * @var array Methods that will be ignored by API checking routine (utility methods)
      */
     private $_apiIgnoreMethods = ['handle-error', 'generate-confluence-documentation'];
-
-    /**
-     * @var IdentityInterface Identity provider
-     */
-    private $_identity = null;
 
     /**
      * @var array Errors
@@ -84,17 +80,6 @@ abstract class ApiController extends Controller
 
         $this->defaultAction = 'generate-definition';
 
-        //Force SSL check
-        if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
-            $this->setError(Yii::t('api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
-        }
-
-        //Request method check
-        Yii::$app->request->isPost or $this->setError(Yii::t('api', 'Request method must be POST'), 'REQUEST_NOT_POST');
-
-        //Parse input variables from request
-        $this->_parseInput();
-
         Yii::$app->errorHandler->errorAction = $this->uniqueId . '/handle-error';
     }
 
@@ -126,18 +111,6 @@ abstract class ApiController extends Controller
     }
 
     /**
-     * Set identity for client authentication
-     *
-     * @param IdentityInterface $identity Identity class
-     *
-     * @return void
-     */
-    public function setIdentity(IdentityInterface $identity)
-    {
-        $this->_identity = $identity;
-    }
-
-    /**
      * Check if there were some errors while executing API request
      *
      * @return bool Has been errors detected
@@ -159,6 +132,14 @@ abstract class ApiController extends Controller
         if (in_array($action->id, $this->_apiIgnoreMethods)) {
             return true;
         }
+
+        //Force SSL check
+        if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
+            $this->setError(Yii::t('api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
+        }
+
+        //Request method check
+        Yii::$app->request->isPost or $this->setError(Yii::t('api', 'Request method must be POST'), 'REQUEST_NOT_POST');
 
         if ($action instanceof InlineAction) {
             //Inline action
@@ -192,16 +173,9 @@ abstract class ApiController extends Controller
 
         //Auth
         if (!$this->_methodInfo['no-auth']) {
-            if ($this->_identity === null) {
-                $this->setError(
-                    Yii::t('api', 'Identity not set. Please set it in init() method by calling setIdentity()'),
-                    'IDENTITY_NOT_SET'
-                );
-            }
-
             //Login
-            if (!Yii::$app->user->login($this->_identity)) {
-                $this->setError(Yii::t('api', 'Wrong login credentials'), 'WRONG_LOGIN');
+            if (Yii::$app->user->isGuest()) {
+                $this->setError(Yii::t('api', 'User is not logged in'), 'NOT_LOGGED_IN');
             }
 
             //Permission
@@ -383,7 +357,7 @@ abstract class ApiController extends Controller
      */
     private function _examineMethod($method)
     {
-        $cache = Yii::$app->cache->get([__CLASS__, $method->getName(), 'info']);
+        $cache = Yii::$app->cache->get([$method->class, $method->getName(), 'info']);
         if ($cache) {
             return $cache;
         }
@@ -478,7 +452,7 @@ abstract class ApiController extends Controller
         }
 
         //Save to cache
-        Yii::$app->cache->set([__CLASS__, $method->getName(), 'info'], $result, self::CACHE_TTL);
+        Yii::$app->cache->set([$method->class, $method->getName(), 'info'], $result, self::CACHE_TTL);
 
         return $result;
     }
@@ -527,7 +501,7 @@ abstract class ApiController extends Controller
             }
         }
 
-        asort($methods);
+        ksort($methods);
 
         $result['methods'] = $methods;
 
@@ -566,6 +540,8 @@ abstract class ApiController extends Controller
                 }
             }
         }
+
+        ksort($result['properties']);
 
         //Constants
         $result['constants'] = $reflection->getConstants();
