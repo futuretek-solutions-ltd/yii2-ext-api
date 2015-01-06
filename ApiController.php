@@ -157,6 +157,9 @@ abstract class ApiController extends Controller
             $this->setError(Yii::t('api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
         }
 
+        //Get input from POST body
+        $this->_parseInput();
+
         $reflection = new \ReflectionMethod($className, $classMethod);
         $reflection->isPublic() or $this->setError(Yii::t('api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
 
@@ -290,7 +293,7 @@ abstract class ApiController extends Controller
      * @param Action $action Action object
      * @param mixed  $result Action result
      *
-     * @return void
+     * @return mixed
      */
     public function afterAction($action, $result)
     {
