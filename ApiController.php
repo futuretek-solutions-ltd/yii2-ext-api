@@ -177,7 +177,7 @@ abstract class ApiController extends Controller
         //Auth
         if (!$this->_methodInfo['no-auth']) {
             //Login
-            if (Yii::$app->user->isGuest()) {
+            if (Yii::$app->user->isGuest) {
                 $this->setError(Yii::t('api', 'User is not logged in'), 'NOT_LOGGED_IN');
             }
 
@@ -302,6 +302,16 @@ abstract class ApiController extends Controller
         }
 
         $type = gettype($result);
+
+        //Replace uncommon types
+        switch ($this->_methodInfo['return']['type']) {
+        case 'bool':
+            $this->_methodInfo['return']['type'] = 'boolean';
+            break;
+        case 'int':
+            $this->_methodInfo['return']['type'] = 'integer';
+            break;
+        }
 
         //Method return type vs. phpDoc return type
         if (isset($this->_methodInfo['return']['type']) and $this->_methodInfo['return']['type'] != $type) {
