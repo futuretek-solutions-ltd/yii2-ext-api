@@ -586,15 +586,13 @@ abstract class ApiController extends Controller
     {
         $postBody = file_get_contents('php://input');
 
-        if (!$postBody) {
-            $this->setError(Yii::t('api', 'Request body is empty'), 'REQUEST_EMPTY');
-        }
-
-        try {
-            $json = Json::decode($postBody);
-            $this->_inputVars = $json;
-        } catch (InvalidParamException $e) {
-            $this->setError($e->getMessage(), 'JSON_ERROR');
+        if ($postBody) {
+            try {
+                $json = Json::decode($postBody);
+                $this->_inputVars = $json;
+            } catch (InvalidParamException $e) {
+                $this->setError($e->getMessage(), 'JSON_ERROR');
+            }
         }
     }
 
