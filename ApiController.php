@@ -217,7 +217,9 @@ abstract class ApiController extends Controller
                     $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                 }
             } else {
-                $this->setError(Yii::t('api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
+                if ($param['required']) {
+                    $this->setError(Yii::t('api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
+                }
             }
         }
 
