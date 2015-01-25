@@ -121,6 +121,18 @@ abstract class ApiController extends Controller
     }
 
     /**
+     * Method is called before API authorization
+     *
+     * @param bool   $stateLessApi If the API is stateless
+     * @param Action $action       Action object
+     * @param array  $inputVars    Input variables
+     */
+    public function checkAuth($stateLessApi, $action, $inputVars)
+    {
+
+    }
+
+    /**
      * Event ran before every action
      *
      * @param Action $action Action object
@@ -176,6 +188,8 @@ abstract class ApiController extends Controller
 
         //Auth
         if (!$this->_methodInfo['no-auth']) {
+            $this->checkAuth($this->statelessApi, $action, $this->_inputVars);
+
             //Login
             if (Yii::$app->user->isGuest) {
                 $this->setError(Yii::t('api', 'User is not logged in'), 'NOT_LOGGED_IN');
