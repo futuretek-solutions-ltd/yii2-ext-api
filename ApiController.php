@@ -98,6 +98,21 @@ abstract class ApiController extends Controller
     }
 
     /**
+     * Set error messages from model and stop executing request
+     *
+     * @param array $modelErrors Model errors from model's firstErrors property
+     *
+     * @return void
+     */
+    public function setModelErrors(array $modelErrors)
+    {
+        foreach ($modelErrors as $field => $message) {
+            $this->_errors[] = ['message' => $message, 'code' => 'MODEL_VALIDATION'];
+        }
+        $this->renderResponse();
+    }
+
+    /**
      * Set error message and continue executing request. Error will be still returned in the response
      *
      * @param string $message Error message
