@@ -402,7 +402,7 @@ abstract class ApiController extends Controller
     private function _examineMethod($method)
     {
         $cache = Yii::$app->cache->get([$method->class, $method->getName(), 'info']);
-        if ($cache) {
+        if ($cache && !YII_DEBUG) {
             return $cache;
         }
 
