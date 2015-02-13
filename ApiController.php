@@ -701,14 +701,14 @@ abstract class ApiController extends Controller
             default:
                 $type = 'PHP error';
             }
-            $this->_errors = [
+            $this->_errors[] = [
                 'code' => $type,
                 'message' => $exception->getMessage(),
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
             ];
         } else {
-            $this->_errors = [
+            $this->_errors[] = [
                 'code' => get_class($exception),
                 'message' => $exception->getMessage(),
                 'file' => $exception->getFile(),
@@ -716,7 +716,7 @@ abstract class ApiController extends Controller
             ];
         }
 
-        Yii::trace(print_r($this->_errors, true), $category, 'api.' . $this->uniqueId);
+        Yii::trace(print_r($this->_errors[], true), $category, 'api.' . $this->uniqueId);
         $this->renderResponse();
     }
 
