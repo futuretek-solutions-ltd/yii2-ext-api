@@ -745,7 +745,7 @@ abstract class ApiController extends Controller
             ];
         }
 
-        Yii::trace(print_r($this->_errors[], true), $category, 'api.' . $this->uniqueId);
+        Yii::trace(print_r($this->_errors, true), $category, 'api.' . $this->uniqueId);
         $this->renderResponse();
     }
 
