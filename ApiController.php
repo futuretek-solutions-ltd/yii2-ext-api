@@ -66,6 +66,17 @@ abstract class ApiController extends Controller
     public $statelessApi = true;
 
     /**
+     * @var bool Identity mode.
+     *           <ul>
+     *           <li>If enabled, you are responsible for login using custom identity.</li>
+     *           <li>If disabled, authorization is done using checkAuth method's return value.<br/>
+     *           WARNING: Permissions are not available in this mode!</li>
+     *           </ul>
+     *           Default: yes.
+     */
+    public $identityMode = true;
+
+    /**
      * Init method
      *
      * @return void
@@ -141,10 +152,12 @@ abstract class ApiController extends Controller
      * @param bool   $stateLessApi If the API is stateless
      * @param Action $action       Action object
      * @param array  $inputVars    Input variables
+     *
+     * @return bool Whether API is authorized
      */
     public function checkAuth($stateLessApi, $action, $inputVars)
     {
-
+        return true;
     }
 
     /**
@@ -203,15 +216,15 @@ abstract class ApiController extends Controller
 
         //Auth
         if (!$this->_methodInfo['no-auth']) {
-            $this->checkAuth($this->statelessApi, $action, $this->_inputVars);
+            $authorized = $this->checkAuth($this->statelessApi, $action, $this->_inputVars);
 
             //Login
-            if (Yii::$app->user->isGuest) {
+            if ((Yii::$app->user->isGuest && $this->identityMode) || (!$this->identityMode && !$authorized)) {
                 $this->setError(Yii::t('api', 'User is not logged in'), 'NOT_LOGGED_IN');
             }
 
             //Permission
-            if ($this->_methodInfo['permission']) {
+            if ($this->_methodInfo['permission'] && !$this->identityMode) {
                 if (!Yii::$app->user->can($this->_methodInfo['permission'])) {
                     $this->setError(Yii::t('api', 'You have not permission to run this action'), 'ACCESS_DENIED');
                 }
@@ -263,8 +276,10 @@ abstract class ApiController extends Controller
     /**
      * Runs an action within this controller with the specified action ID and parameters.
      * If the action ID is empty, the method will use [[defaultAction]].
-     * @param string $id the ID of the action to be executed.
-     * @param array $params the parameters (name-value pairs) to be passed to the action.
+     *
+     * @param string $id     the ID of the action to be executed.
+     * @param array  $params the parameters (name-value pairs) to be passed to the action.
+     *
      * @return mixed the result of the action.
      * @throws InvalidRouteException if the requested action ID cannot be resolved into an action successfully.
      * @see createAction()
@@ -416,7 +431,7 @@ abstract class ApiController extends Controller
         $result['no-auth'] = !(strpos($comment, '@no-auth') === false);
         $result['transaction'] = !(strpos($comment, '@transaction') === false);
 
-        $comment = strtr($comment, array("\r\n" => "\n", "\r" => "\n"));
+        $comment = strtr($comment, ["\r\n" => "\n", "\r" => "\n"]);
         $comment = preg_replace('/^\s*\**(\s*?$|\s*)/m', '', $comment);
 
         $result['name'] = $method->getName();
@@ -426,14 +441,28 @@ abstract class ApiController extends Controller
         $params = $method->getParameters();
         $n = preg_match_all('/^@param\s+([\w\.\\\]+(\[\s*\])?)\s*?(\$[\w\.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
         if ($n != count($params)) {
-            $this->setError(Yii::t('api', 'Params count of the method {method} differs from phpDoc params count', ['method' => $method->getShortName()]), 'PARAM_COUNT_MISMATCH');
+            $this->setError(
+                Yii::t(
+                    'api',
+                    'Params count of the method {method} differs from phpDoc params count',
+                    ['method' => $method->getShortName()]
+                ),
+                'PARAM_COUNT_MISMATCH'
+            );
         }
 
         for ($i = 0; $i < $n; ++$i) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1][$i]);
 
             if (!in_array('$' . $params[$i]->getName(), $matches[3])) {
-                $this->setError(Yii::t('api', 'Documented param {param} not found in the method {method} definition', ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]), 'PARAM_COUNT_MISMATCH');
+                $this->setError(
+                    Yii::t(
+                        'api',
+                        'Documented param {param} not found in the method {method} definition',
+                        ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]
+                    ),
+                    'PARAM_COUNT_MISMATCH'
+                );
             }
 
             $result['params'][$params[$i]->getName()] = [
@@ -556,7 +585,7 @@ abstract class ApiController extends Controller
         $result['filename'] = $reflection->getFileName();
         $result['url'] = $this->getUniqueId();
         $comment = $reflection->getDocComment();
-        $comment = strtr($comment, array("\r\n" => "\n", "\r" => "\n"));
+        $comment = strtr($comment, ["\r\n" => "\n", "\r" => "\n"]);
         $comment = preg_replace('/^\s*\**(\s*?$|\s*)/m', '', $comment);
 
         //Description
@@ -570,7 +599,7 @@ abstract class ApiController extends Controller
         foreach ($reflection->getProperties() as $prop) {
             if (($prop->isPublic() or $prop->isStatic()) and (strpos($prop->class, 'yii\\') === false)) {
                 $comment = $prop->getDocComment();
-                $comment = strtr($comment, array("\r\n" => "\n", "\r" => "\n"));
+                $comment = strtr($comment, ["\r\n" => "\n", "\r" => "\n"]);
                 $comment = preg_replace('/^\s*\**(\s*?$|\s*)/m', '', $comment);
 
                 //Var
@@ -748,7 +777,8 @@ abstract class ApiController extends Controller
         if (isset($api['properties']['statelessApi']['value']) and $api['properties']['statelessApi']['value']) {
             $stateless = '*bezestavové*, tzn. je potřeba se při každém požadavku ověřit platnými přístupovými údaji.';
         } else {
-            $stateless = '*stavové*, tzn. uživatel je po přihlášení na předem stanovenou dobu vůči serveru ověřen. Pro zrušení ověření je potřeba provést odhlášení.';
+            $stateless =
+                '*stavové*, tzn. uživatel je po přihlášení na předem stanovenou dobu vůči serveru ověřen. Pro zrušení ověření je potřeba provést odhlášení.';
         }
 
         $errorCodesGlobal = array_unique($this->_parseErrorCodes(__FILE__));
@@ -829,7 +859,6 @@ END;
         foreach ($errorCodesLocal as $code) {
             echo "* *{$code}*\r\n";
         }
-
 
         //Constants
         echo "\r\n";
