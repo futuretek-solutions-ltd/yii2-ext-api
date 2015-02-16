@@ -2,6 +2,7 @@
 
 namespace futuretek\api;
 
+use futuretek\shared\Tools;
 use Yii;
 use yii\helpers\Url;
 
@@ -47,7 +48,7 @@ abstract class ApiClient
      * Send API request
      *
      * @param string $method Method name in format (method-name)
-     * @param array $params Method input parameters
+     * @param array  $params Method input parameters
      *
      * @return bool|mixed Method API response or boolean false on error
      */
@@ -105,6 +106,20 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($this->_curl, CURLOPT_REFERER, Url::base());
         curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);
+    }
+
+    protected function apiCallEnumerator($function)
+    {
+        $inputParams = [];
+        foreach ((new \ReflectionFunction($function))->getParameters() as $param) {
+            $paramName = $param->getName();
+            $inputParams[$paramName] = $$paramName;
+        }
+        $response = $this->send(Tools::toCommaCase($function), $inputParams);
+
+        $func = $function . 'Result';
+
+        return new $func($response);
     }
 
 }
