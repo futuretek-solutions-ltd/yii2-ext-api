@@ -69,9 +69,17 @@ abstract class ApiClient
             return false;
         }
 
-        curl_setopt($this->_curl, CURLOPT_POSTFIELDS, $request);
-        curl_setopt($this->_curl, CURLOPT_URL, rtrim($this->_serverUrl, '/') . '/' . $method);
-        $response = curl_exec($this->_curl);
+        $response = false;
+        if (is_array($this->_serverUrl)) {
+            foreach ($this->_serverUrl as $url) {
+                $response = $this->_innerSend(rtrim($url, '/') . '/' . $method, $request);
+                if ($response) {
+                    break;
+                }
+            }
+        } else {
+            $response = $this->_innerSend(rtrim($this->_serverUrl, '/') . '/' . $method, $request);
+        }
 
         if (!$response) {
             return false;
@@ -83,6 +91,14 @@ abstract class ApiClient
         }
 
         return $response;
+    }
+
+    private function _innerSend($url, $request)
+    {
+        curl_setopt($this->_curl, CURLOPT_URL, $url);
+        curl_setopt($this->_curl, CURLOPT_POSTFIELDS, $request);
+
+        return curl_exec($this->_curl);
     }
 
     /**
@@ -108,18 +124,27 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);
     }
 
-    protected function apiCallEnumerator($function)
+    protected function apiCallEnumerator($class, $function, $arguments)
     {
         $inputParams = [];
-        foreach ((new \ReflectionFunction($function))->getParameters() as $param) {
+        $i = 0;
+        foreach ((new \ReflectionMethod($class, $function))->getParameters() as $param) {
             $paramName = $param->getName();
-            $inputParams[$paramName] = $$paramName;
+            $inputParams[$paramName] = $arguments[$i];
+            $i++;
+            if ($i == count($arguments)) {
+                break;
+            }
         }
         $response = $this->send(Tools::toCommaCase($function), $inputParams);
 
-        $func = $function . 'Result';
+        if (!$response) {
+            return null;
+        };
 
-        return new $func($response);
+        $namespace = (new \ReflectionClass($class))->getNamespaceName();
+
+        return (new \ReflectionClass($namespace . '\\' . $function . 'Result'))->newInstanceArgs([$response]);
     }
 
 }
