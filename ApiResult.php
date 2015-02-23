@@ -8,7 +8,7 @@
  * @link    http://www.futuretek.cz
  */
 
-namespace futuretek\lms\api;
+namespace futuretek\api;
 
 /**
  * Class ApiResult
