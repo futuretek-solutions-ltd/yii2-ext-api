@@ -16,7 +16,6 @@ use yii\helpers\Url;
  */
 abstract class ApiClient
 {
-    private $_serverUrl;
     private $_serverHost;
     private $_curl;
 
@@ -62,7 +61,7 @@ abstract class ApiClient
      */
     public function send($method, array $params)
     {
-        if (!$this->_serverUrl) {
+        if (!$this->_serverHost) {
             return false;
         }
 
@@ -78,15 +77,15 @@ abstract class ApiClient
         }
 
         $response = false;
-        if (is_array($this->_serverUrl)) {
-            foreach ($this->_serverUrl as $url) {
+        if (is_array($this->_serverHost)) {
+            foreach ($this->_serverHost as $url) {
                 $response = $this->_innerSend(rtrim($url, '/') . $this->getApiUrl() . $method, $request);
                 if ($response) {
                     break;
                 }
             }
         } else {
-            $response = $this->_innerSend(rtrim($this->_serverUrl, '/') . $this->getApiUrl() . $method, $request);
+            $response = $this->_innerSend(rtrim($this->_serverHost, '/') . $this->getApiUrl() . $method, $request);
         }
 
         if (!$response) {
