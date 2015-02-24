@@ -17,6 +17,7 @@ use yii\helpers\Url;
 abstract class ApiClient
 {
     private $_serverUrl;
+    private $_serverHost;
     private $_curl;
 
     function __construct()
@@ -26,16 +27,23 @@ abstract class ApiClient
     }
 
     /**
-     * Set server URL without the method name
+     * Set server host
      *
-     * @param string $serverUrl Server URL
+     * @param string $serverHostUrl Server host URL
      *
      * @return void
      */
-    public function setServerUrl($serverUrl)
+    public function setServerHostUrl($serverHostUrl)
     {
-        $this->_serverUrl = $serverUrl;
+        $this->_serverHost = $serverHostUrl;
     }
+
+    /**
+     * Get API URL part
+     *
+     * @return string API URL part
+     */
+    abstract public function getApiUrl();
 
     /**
      * Authorize method
@@ -72,13 +80,13 @@ abstract class ApiClient
         $response = false;
         if (is_array($this->_serverUrl)) {
             foreach ($this->_serverUrl as $url) {
-                $response = $this->_innerSend(rtrim($url, '/') . '/' . $method, $request);
+                $response = $this->_innerSend(rtrim($url, '/') . $this->getApiUrl() . $method, $request);
                 if ($response) {
                     break;
                 }
             }
         } else {
-            $response = $this->_innerSend(rtrim($this->_serverUrl, '/') . '/' . $method, $request);
+            $response = $this->_innerSend(rtrim($this->_serverUrl, '/') . $this->getApiUrl() . $method, $request);
         }
 
         if (!$response) {
@@ -122,6 +130,8 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($this->_curl, CURLOPT_REFERER, Url::base());
         curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);
+        curl_setopt($this->_curl, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($this->_curl, CURLOPT_SSL_VERIFYPEER, false);
     }
 
     protected function apiCallEnumerator($class, $function, $arguments)
