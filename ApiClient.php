@@ -5,6 +5,7 @@ namespace futuretek\api;
 use futuretek\shared\Tools;
 use Yii;
 use yii\helpers\Url;
+use yii\web\Application;
 
 /**
  * Class ApiClient
@@ -127,7 +128,7 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($this->_curl, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($this->_curl, CURLOPT_MAXREDIRS, 10);
-        curl_setopt($this->_curl, CURLOPT_REFERER, Url::base());
+        curl_setopt($this->_curl, CURLOPT_REFERER, (Yii::$app instanceof Application ? Url::base() : ''));
         curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);
         curl_setopt($this->_curl, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($this->_curl, CURLOPT_SSL_VERIFYPEER, false);
