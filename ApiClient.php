@@ -126,7 +126,6 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_POST, true);
         curl_setopt($this->_curl, CURLOPT_USERAGENT, 'FTS-API-Client');
         curl_setopt($this->_curl, CURLOPT_RETURNTRANSFER, true);
-        //curl_setopt($this->_curl, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($this->_curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($this->_curl, CURLOPT_REFERER, (Yii::$app instanceof Application ? Url::base() : ''));
         curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);

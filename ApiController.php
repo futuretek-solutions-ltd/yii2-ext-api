@@ -684,7 +684,7 @@ abstract class ApiController extends Controller
 
         echo Json::encode($response);
 
-        Yii::$app->end();
+        die();
     }
 
     /**
