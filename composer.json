@@ -20,8 +20,8 @@
     },
     "require": {
         "php": ">=5.4.0",
-        "yiisoft/yii2": "*",
-        "futuretek/yii2-shared-components": "*"
+        "yiisoft/yii2": "2.*.*",
+        "futuretek/yii2-shared-components": "1.0.*"
     },
     "repositories": [
         {

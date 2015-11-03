@@ -4,14 +4,16 @@ namespace futuretek\api;
 
 use futuretek\shared\Tools;
 use futuretek\shared\Validate;
-use futuretek\translations\Translator;
 use Yii;
 use yii\base\Action;
 use yii\base\ErrorException;
+use yii\base\ExitException;
 use yii\base\InlineAction;
+use yii\base\InvalidConfigException;
 use yii\base\InvalidParamException;
 use yii\base\InvalidRouteException;
 use yii\base\Module;
+use yii\db\Exception;
 use yii\helpers\Json;
 use yii\log\Logger;
 use yii\web\Controller;
@@ -26,8 +28,6 @@ use yii\web\Controller;
  */
 abstract class ApiController extends Controller
 {
-    use Translator;
-
     /**
      * Cache time to live (in seconds)
      */
@@ -59,11 +59,6 @@ abstract class ApiController extends Controller
     public $forceSecureConnection = true;
 
     /**
-     * @var bool CSRF validation - must be always false
-     */
-    public $enableCsrfValidation = false;
-
-    /**
      * @var bool Use stateless API. With stateless API client must authenticate on each request (default: yes).
      */
     public $statelessApi = true;
@@ -78,6 +73,12 @@ abstract class ApiController extends Controller
      *           Default: yes.
      */
     public $identityMode = true;
+
+    public function __construct($id, Module $module, array $config)
+    {
+        $this->enableCsrfValidation = false;
+        parent::__construct($id, $module, $config);
+    }
 
     /**
      * Init method
@@ -101,7 +102,7 @@ abstract class ApiController extends Controller
      * Set error message and stop executing request
      *
      * @param string $message Error message
-     * @param string $code    Error code
+     * @param string $code Error code
      *
      * @return void
      */
@@ -130,7 +131,7 @@ abstract class ApiController extends Controller
      * Set error message and continue executing request. Error will be still returned in the response
      *
      * @param string $message Error message
-     * @param string $code    Error code
+     * @param string $code Error code
      *
      * @return void
      */
@@ -146,15 +147,15 @@ abstract class ApiController extends Controller
      */
     public function hasErrors()
     {
-        return !empty($this->_errors);
+        return 0 === count($this->_errors);
     }
 
     /**
      * Method is called before API authorization
      *
-     * @param bool   $stateLessApi If the API is stateless
-     * @param Action $action       Action object
-     * @param array  $inputVars    Input variables
+     * @param bool $stateLessApi If the API is stateless
+     * @param Action $action Action object
+     * @param array $inputVars Input variables
      *
      * @return bool Whether API is authorized
      */
@@ -172,17 +173,17 @@ abstract class ApiController extends Controller
      */
     public function beforeAction($action)
     {
-        if (in_array($action->id, $this->_apiIgnoreMethods)) {
+        if (in_array($action->id, $this->_apiIgnoreMethods, true)) {
             return true;
         }
 
         //Force SSL check
         if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
-            $this->setError(self::t('api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
+            $this->setError(Yii::t('futuretek/yii2-api/api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
         }
 
         //Request method check
-        Yii::$app->request->isPost or $this->setError(self::t('api', 'Request method must be POST'), 'REQUEST_NOT_POST');
+        Yii::$app->request->isPost or $this->setError(Yii::t('futuretek/yii2-api/api', 'Request method must be POST'), 'REQUEST_NOT_POST');
 
         if ($action instanceof InlineAction) {
             //Inline action
@@ -190,31 +191,31 @@ abstract class ApiController extends Controller
             $classMethod = $action->actionMethod;
         } elseif ($action instanceof Action) {
             //External action
-            $action->hasMethod('run') or $this->setError(self::t('api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
+            $action->hasMethod('run') or $this->setError(Yii::t('futuretek/yii2-api/api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
             $className = $action->className();
             $classMethod = 'run';
         } else {
             //Wrong class parent
             $className = '';
             $classMethod = '';
-            $this->setError(self::t('api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
+            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
         }
 
         //Get input from POST body
         $this->_parseInput();
 
         $reflection = new \ReflectionMethod($className, $classMethod);
-        $reflection->isPublic() or $this->setError(self::t('api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
+        $reflection->isPublic() or $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
 
         //Examine method
         $this->_methodInfo = $this->_examineMethod($reflection);
         if (!$this->_methodInfo) {
-            $this->setError(self::t('api', 'Method has no phpDoc comment'), 'NO_PHPDOC');
+            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method has no phpDoc comment'), 'NO_PHPDOC');
         }
 
         //API tag
         if (!$this->_methodInfo['api']) {
-            $this->setError(self::t('api', 'Method is not intended for use via API'), 'NOT_API_ENABLED');
+            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not intended for use via API'), 'NOT_API_ENABLED');
         }
 
         //Auth
@@ -223,29 +224,26 @@ abstract class ApiController extends Controller
 
             //Login
             if ((Yii::$app->user->isGuest && $this->identityMode) || (!$this->identityMode && !$authorized)) {
-                $this->setError(self::t('api', 'User is not logged in'), 'NOT_LOGGED_IN');
+                $this->setError(Yii::t('futuretek/yii2-api/api', 'User is not logged in'), 'NOT_LOGGED_IN');
             }
 
             //Permission
-            if ($this->_methodInfo['permission'] && !$this->identityMode) {
-                if (!Yii::$app->user->can($this->_methodInfo['permission'])) {
-                    $this->setError(self::t('api', 'You have not permission to run this action'), 'ACCESS_DENIED');
-                }
+            if (!$this->identityMode && $this->_methodInfo['permission'] && !Yii::$app->user->can($this->_methodInfo['permission'])) {
+                $this->setError(Yii::t('futuretek/yii2-api/api', 'You have not permission to run this action'), 'ACCESS_DENIED');
             }
         }
 
         //Validate input params
         foreach ($this->_methodInfo['params'] as $paramName => $param) {
-            if (isset($this->_inputVars[$paramName])) { //Input param exists
-                if (isset($param['validate']) && $param['validate']) { //Validator is set
+            if (array_key_exists($paramName, $this->_inputVars)) { //Input param exists
+                if (array_key_exists('validate', $param) && $param['validate']) { //Validator is set
                     if (method_exists('\futuretek\shared\Validate', $param['validate'])) { // Validator method exists
                         $validator = $param['validate'];
                         if (Validate::$validator($this->_inputVars[$paramName])) { //Input param valid
                             $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                         } else {
                             $this->setError(
-                                self::t(
-                                    'api',
+                                Yii::t('futuretek/yii2-api/api',
                                     'Parameter {param} is not valid (validator {validator})',
                                     ['param' => $paramName, 'validator' => $param['validate']]
                                 ),
@@ -254,7 +252,7 @@ abstract class ApiController extends Controller
                         }
                     } else {
                         $this->setError(
-                            self::t('api', 'Validator {validator} method not found', ['validator' => $param['validate']]),
+                            Yii::t('futuretek/yii2-api/api', 'Validator {validator} method not found', ['validator' => $param['validate']]),
                             'VALIDATOR_NOT_FOUND'
                         );
                     }
@@ -263,13 +261,13 @@ abstract class ApiController extends Controller
                 }
             } else {
                 if ($param['required']) {
-                    $this->setError(self::t('api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
+                    $this->setError(Yii::t('futuretek/yii2-api/api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
                 }
             }
         }
 
         //Transaction
-        if ($this->_methodInfo['transaction'] && Yii::$app->db->transaction === null) {
+        if (Yii::$app->db->transaction === null && $this->_methodInfo['transaction']) {
             Yii::$app->db->beginTransaction();
         }
 
@@ -280,11 +278,13 @@ abstract class ApiController extends Controller
      * Runs an action within this controller with the specified action ID and parameters.
      * If the action ID is empty, the method will use [[defaultAction]].
      *
-     * @param string $id     the ID of the action to be executed.
-     * @param array  $params the parameters (name-value pairs) to be passed to the action.
+     * @param string $id the ID of the action to be executed.
+     * @param array $params the parameters (name-value pairs) to be passed to the action.
      *
      * @return mixed the result of the action.
      * @throws InvalidRouteException if the requested action ID cannot be resolved into an action successfully.
+     * @throws InvalidConfigException if the action class does not have a run() method
+     * @throws Exception if the transaction is not active
      * @see createAction()
      */
     public function runAction($id, $params = [])
@@ -294,7 +294,7 @@ abstract class ApiController extends Controller
             throw new InvalidRouteException('Unable to resolve the request: ' . $this->getUniqueId() . '/' . $id);
         }
 
-        Yii::trace("Route to run: " . $action->getUniqueId(), __METHOD__);
+        Yii::trace('Route to run: ' . $action->getUniqueId(), __METHOD__);
 
         if (Yii::$app->requestedAction === null) {
             Yii::$app->requestedAction = $action;
@@ -340,13 +340,14 @@ abstract class ApiController extends Controller
      * Event ran after every action
      *
      * @param Action $action Action object
-     * @param mixed  $result Action result
+     * @param mixed $result Action result
      *
      * @return mixed
+     * @throws Exception if the transaction is not active
      */
     public function afterAction($action, $result)
     {
-        if (in_array($action->id, $this->_apiIgnoreMethods)) {
+        if (in_array($action->id, $this->_apiIgnoreMethods, true)) {
             return;
         }
 
@@ -354,19 +355,18 @@ abstract class ApiController extends Controller
 
         //Replace uncommon types
         switch ($this->_methodInfo['return']['type']) {
-        case 'bool':
-            $this->_methodInfo['return']['type'] = 'boolean';
-            break;
-        case 'int':
-            $this->_methodInfo['return']['type'] = 'integer';
-            break;
+            case 'bool':
+                $this->_methodInfo['return']['type'] = 'boolean';
+                break;
+            case 'int':
+                $this->_methodInfo['return']['type'] = 'integer';
+                break;
         }
 
         //Method return type vs. phpDoc return type
-        if (isset($this->_methodInfo['return']['type']) and $this->_methodInfo['return']['type'] != $type) {
+        if (array_key_exists('type', $this->_methodInfo['return']) && $this->_methodInfo['return']['type'] !== $type) {
             $this->setError(
-                self::t(
-                    'api',
+                Yii::t('futuretek/yii2-api/api',
                     'Method return type ({t1}) differs from API return type ({t2})',
                     ['t1' => $type, 't2' => $this->_methodInfo['return']['type']]
                 ),
@@ -376,34 +376,34 @@ abstract class ApiController extends Controller
 
         //Method return type check
         switch ($type) {
-        case 'integer':
-        case 'boolean':
-            $result = boolval($result);
-            break;
-        case 'double':
-            $result = boolval(floor($result));
-            break;
-        case 'string':
-            $result = boolval(intval($result));
-            break;
-        case 'array':
-            break;
-        default:
-            $this->setError(self::t('api', 'Method return type ({type}) is not supported', ['type' => $type]), 'RETURN_TYPE_NOT_SUPPORTED');
+            case 'integer':
+            case 'boolean':
+                $result = (bool)$result;
+                break;
+            case 'double':
+                $result = (bool)floor($result);
+                break;
+            case 'string':
+                $result = (bool)(int)$result;
+                break;
+            case 'array':
+                break;
+            default:
+                $this->setError(Yii::t('futuretek/yii2-api/api', 'Method return type ({type}) is not supported', ['type' => $type]), 'RETURN_TYPE_NOT_SUPPORTED');
         }
 
         //Return value check
         if (!$result) {
-            $this->setError(self::t('api', 'Method returned boolean false'), 'RETURN_VALUE_FALSE');
+            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method returned boolean false'), 'RETURN_VALUE_FALSE');
         }
 
         //If not array, do not return anything
-        if ($type != 'array') {
+        if ($type !== 'array') {
             $result = [];
         }
 
         //Transaction
-        if ($this->_methodInfo['transaction'] && Yii::$app->db->transaction != null) {
+        if (Yii::$app->db->transaction !== null && $this->_methodInfo['transaction']) {
             Yii::$app->db->transaction->commit();
         }
 
@@ -415,7 +415,7 @@ abstract class ApiController extends Controller
      *
      * @param \ReflectionMethod $method Reflection method object
      *
-     * @return array|bool Reflection info
+     * @return array Reflection info or false on error
      */
     private function _examineMethod($method)
     {
@@ -443,10 +443,9 @@ abstract class ApiController extends Controller
         $result['params'] = [];
         $params = $method->getParameters();
         $n = preg_match_all('/^@param\s+([\w\.\\\]+(\[\s*\])?)\s*?(\$[\w\.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
-        if ($n != count($params)) {
+        if ($n !== count($params)) {
             $this->setError(
-                self::t(
-                    'api',
+                Yii::t('futuretek/yii2-api/api',
                     'Params count of the method {method} differs from phpDoc params count',
                     ['method' => $method->getShortName()]
                 ),
@@ -457,10 +456,9 @@ abstract class ApiController extends Controller
         for ($i = 0; $i < $n; ++$i) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1][$i]);
 
-            if (!in_array('$' . $params[$i]->getName(), $matches[3])) {
+            if (!in_array('$' . $params[$i]->getName(), $matches[3], true)) {
                 $this->setError(
-                    self::t(
-                        'api',
+                    Yii::t('futuretek/yii2-api/api',
                         'Documented param {param} not found in the method {method} definition',
                         ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]
                     ),
@@ -475,16 +473,16 @@ abstract class ApiController extends Controller
                 'default' => ($params[$i]->isDefaultValueAvailable() ? $params[$i]->getDefaultValue() : null),
             ];
 
-            if (isset($matches[5][$i])) {
+            if (array_key_exists($i, $matches[5])) {
                 foreach (explode(',', trim($matches[5][$i], '{} ')) as $item) {
                     $tmp = explode('=', trim($item));
-                    if (count($tmp) == 2) {
-                        if (trim($tmp[0]) == 'element') {
+                    if (count($tmp) === 2) {
+                        if (trim($tmp[0]) === 'element') {
                             $eTmp = explode('|', trim($tmp[1]));
-                            if (isset($eTmp[1])) {
+                            if (array_key_exists(1, $eTmp)) {
                                 $result['params'][$params[$i]->getName()]['elements'][trim($eTmp[0])]['type'] = trim($eTmp[1]);
                             }
-                            if (isset($eTmp[2])) {
+                            if (array_key_exists(2, $eTmp)) {
                                 $result['params'][$params[$i]->getName()]['elements'][trim($eTmp[0])]['description'] = trim($eTmp[2]);
                             }
                         } else {
@@ -568,7 +566,7 @@ abstract class ApiController extends Controller
         //Inline actions
         $reflection = new \ReflectionClass($this);
         foreach ($reflection->getMethods() as $method) {
-            if ($method->isPublic() and substr($method->getName(), 0, 6) == 'action') {
+            if ($method->isPublic() and substr($method->getName(), 0, 6) === 'action') {
                 $info = $this->_examineMethod($method);
                 if ($info['api']) {
                     $name = Tools::toCommaCase(substr($method->getName(), 6));
@@ -664,21 +662,25 @@ abstract class ApiController extends Controller
      *
      * @return void
      */
-    public function renderResponse($response = [])
+    public function renderResponse(array $response = [])
     {
         header('Expires: Sat, 26 Jul 1997 05:00:00 GMT');
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Cache-Control: post-check=0, pre-check=0', false);
         header('Pragma: no-cache');
-        header("Content-Type: application/json; charset=UTF-8");
+        header('Content-Type: application/json; charset=UTF-8');
 
         if ($this->hasErrors()) {
             $response = [];
 
             //Transaction rollback
-            if (Yii::$app->db->transaction != null) {
-                Yii::$app->db->transaction->rollBack();
+            if (Yii::$app->db->transaction !== null) {
+                try {
+                    Yii::$app->db->transaction->rollBack();
+                } catch (\Throwable $e) {
+                    $this->setError($e->getMessage(), $e->getCode());
+                }
             }
         }
 
@@ -694,13 +696,14 @@ abstract class ApiController extends Controller
      * Handle all errors in this controller
      *
      * @return void
+     * @throws Exception if the transaction is not active
      */
     public function actionHandleError()
     {
         $exception = Yii::$app->errorHandler->exception;
 
         //Transaction
-        if (Yii::$app->db->transaction != null) {
+        if (Yii::$app->db->transaction !== null) {
             Yii::$app->db->transaction->rollBack();
         }
 
@@ -708,30 +711,30 @@ abstract class ApiController extends Controller
 
         if ($exception instanceof ErrorException) {
             switch ($exception->getCode()) {
-            case E_WARNING:
-                $type = 'PHP warning';
-                $category = Logger::LEVEL_WARNING;
-                break;
-            case E_NOTICE:
-                $type = 'PHP notice';
-                $category = Logger::LEVEL_WARNING;
-                break;
-            case E_USER_ERROR:
-                $type = 'User error';
-                break;
-            case E_USER_WARNING:
-                $type = 'User warning';
-                $category = Logger::LEVEL_WARNING;
-                break;
-            case E_USER_NOTICE:
-                $type = 'User notice';
-                $category = Logger::LEVEL_WARNING;
-                break;
-            case E_RECOVERABLE_ERROR:
-                $type = 'Recoverable error';
-                break;
-            default:
-                $type = 'PHP error';
+                case E_WARNING:
+                    $type = 'PHP warning';
+                    $category = Logger::LEVEL_WARNING;
+                    break;
+                case E_NOTICE:
+                    $type = 'PHP notice';
+                    $category = Logger::LEVEL_WARNING;
+                    break;
+                case E_USER_ERROR:
+                    $type = 'User error';
+                    break;
+                case E_USER_WARNING:
+                    $type = 'User warning';
+                    $category = Logger::LEVEL_WARNING;
+                    break;
+                case E_USER_NOTICE:
+                    $type = 'User notice';
+                    $category = Logger::LEVEL_WARNING;
+                    break;
+                case E_RECOVERABLE_ERROR:
+                    $type = 'Recoverable error';
+                    break;
+                default:
+                    $type = 'PHP error';
             }
             $this->_errors[] = [
                 'code' => $type,
@@ -772,17 +775,15 @@ abstract class ApiController extends Controller
      * Generate API documentation in Confluence markup
      *
      * @return void
+     * @throws ExitException if the application is in testing mode
      */
     public function actionGenerateConfluenceDocumentation()
     {
         $api = $this->_innerGenerateAvailableActions();
 
-        if (isset($api['properties']['statelessApi']['value']) and $api['properties']['statelessApi']['value']) {
-            $stateless = '*bezestavové*, tzn. je potřeba se při každém požadavku ověřit platnými přístupovými údaji.';
-        } else {
-            $stateless =
-                '*stavové*, tzn. uživatel je po přihlášení na předem stanovenou dobu vůči serveru ověřen. Pro zrušení ověření je potřeba provést odhlášení.';
-        }
+        $stateless = array_key_exists('value', $api['properties']['statelessApi']) and $api['properties']['statelessApi']['value'] ?
+            '*bezestavové*, tzn. je potřeba se při každém požadavku ověřit platnými přístupovými údaji.' :
+            '*stavové*, tzn. uživatel je po přihlášení na předem stanovenou dobu vůči serveru ověřen. Pro zrušení ověření je potřeba provést odhlášení.';
 
         $errorCodesGlobal = array_unique($this->_parseErrorCodes(__FILE__));
         $errorCodesLocal = array_unique($this->_parseErrorCodes($api['filename']));
@@ -794,7 +795,7 @@ abstract class ApiController extends Controller
         header('Cache-Control: no-store, no-cache, must-revalidate');
         header('Cache-Control: post-check=0, pre-check=0', false);
         header('Pragma: no-cache');
-        header("Content-Type: text/plain; charset=UTF-8");
+        header('Content-Type: text/plain; charset=UTF-8');
 
         echo <<<END
 {info}Vygenerováno {$generated} z API {$api['shortname']}{info}
@@ -880,7 +881,7 @@ END;
         foreach ($api['properties'] as $name => $prop) {
             echo "+*{$name}*+ ({$prop['type']})\r\n";
             echo "_{$prop['description']}_\r\n";
-            if (isset($prop['value']) && $prop['value']) {
+            if (array_key_exists('value', $prop) && $prop['value']) {
                 echo "Výchozí hodnota: {$prop['value']}\r\n";
             }
             echo "\r\n";
@@ -913,13 +914,13 @@ END;
                 foreach ($method['params'] as $name => $param) {
                     echo "*{$name}* : _{$param['type']}_ - {$param['description']}" .
                         (!$param['required'] ? ' _(nepovinný - výchozí hodnota: ' . $param['default'] . ')_' : '') . "\r\n";
-                    if (isset($param['elements'])) {
+                    if (array_key_exists('elements', $param)) {
                         foreach ($param['elements'] as $eName => $element) {
                             echo "* *{$eName}*";
-                            if (isset($element['type'])) {
+                            if (array_key_exists('type', $element)) {
                                 echo " : _{$element['type']}_";
                             }
-                            if (isset($element['description'])) {
+                            if (array_key_exists('description', $element)) {
                                 echo " - {$element['description']}";
                             }
                             echo "\r\n";
@@ -934,7 +935,7 @@ END;
             echo "\r\n";
             echo "+*Návratové hodnoty*+\r\n";
 
-            if ($method['return']['type'] == 'array' and !empty($method['return-params'])) {
+            if ($method['return']['type'] === 'array' and !empty($method['return-params'])) {
                 foreach ($method['return-params'] as $name => $param) {
                     echo "*{$name}* : _{$param['type']}_ - {$param['description']}\r\n";
                 }

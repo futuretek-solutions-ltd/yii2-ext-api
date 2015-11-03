@@ -20,7 +20,7 @@ abstract class ApiClient
     private $_serverHost;
     private $_curl;
 
-    function __construct()
+    public function __construct()
     {
         $this->_curl = curl_init();
         $this->_setCurlOpt();
@@ -50,7 +50,7 @@ abstract class ApiClient
      *
      * @return array Array of input variables uses to authorize against the API
      */
-    abstract function authorize();
+    abstract protected function authorize();
 
     /**
      * Send API request
@@ -58,7 +58,7 @@ abstract class ApiClient
      * @param string $method Method name in format (method-name)
      * @param array  $params Method input parameters
      *
-     * @return bool|mixed Method API response or boolean false on error
+     * @return bool|array Method API response or boolean false on error
      */
     public function send($method, array $params)
     {
@@ -128,7 +128,7 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($this->_curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($this->_curl, CURLOPT_REFERER, (Yii::$app instanceof Application ? Url::base() : ''));
-        curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ["Content-Type: application/json; charset=utf-8"]);
+        curl_setopt($this->_curl, CURLOPT_HTTPHEADER, ['Content-Type: application/json; charset=utf-8']);
         curl_setopt($this->_curl, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($this->_curl, CURLOPT_SSL_VERIFYPEER, false);
     }
@@ -141,7 +141,7 @@ abstract class ApiClient
             $paramName = $param->getName();
             $inputParams[$paramName] = $arguments[$i];
             $i++;
-            if ($i == count($arguments)) {
+            if ($i === count($arguments)) {
                 break;
             }
         }

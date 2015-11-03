@@ -32,7 +32,7 @@ class ApiResult
     /**
      * @param array $config Configuration array
      */
-    function __construct(array $config)
+    public function __construct(array $config)
     {
         foreach ((new \ReflectionClass($this))->getProperties() as $prop) {
             $propName = $prop->getName();
