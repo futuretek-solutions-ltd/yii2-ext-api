@@ -179,11 +179,11 @@ abstract class ApiController extends Controller
 
         //Force SSL check
         if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
-            $this->setError(Yii::t('futuretek/yii2-api/api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
+            $this->setError(Yii::t('fts-yii2-api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
         }
 
         //Request method check
-        Yii::$app->request->isPost or $this->setError(Yii::t('futuretek/yii2-api/api', 'Request method must be POST'), 'REQUEST_NOT_POST');
+        Yii::$app->request->isPost or $this->setError(Yii::t('fts-yii2-api', 'Request method must be POST'), 'REQUEST_NOT_POST');
 
         if ($action instanceof InlineAction) {
             //Inline action
@@ -191,31 +191,31 @@ abstract class ApiController extends Controller
             $classMethod = $action->actionMethod;
         } elseif ($action instanceof Action) {
             //External action
-            $action->hasMethod('run') or $this->setError(Yii::t('futuretek/yii2-api/api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
+            $action->hasMethod('run') or $this->setError(Yii::t('fts-yii2-api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
             $className = $action->className();
             $classMethod = 'run';
         } else {
             //Wrong class parent
             $className = '';
             $classMethod = '';
-            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
+            $this->setError(Yii::t('fts-yii2-api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
         }
 
         //Get input from POST body
         $this->_parseInput();
 
         $reflection = new \ReflectionMethod($className, $classMethod);
-        $reflection->isPublic() or $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
+        $reflection->isPublic() or $this->setError(Yii::t('fts-yii2-api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
 
         //Examine method
         $this->_methodInfo = $this->_examineMethod($reflection);
         if (!$this->_methodInfo) {
-            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method has no phpDoc comment'), 'NO_PHPDOC');
+            $this->setError(Yii::t('fts-yii2-api', 'Method has no phpDoc comment'), 'NO_PHPDOC');
         }
 
         //API tag
         if (!$this->_methodInfo['api']) {
-            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method is not intended for use via API'), 'NOT_API_ENABLED');
+            $this->setError(Yii::t('fts-yii2-api', 'Method is not intended for use via API'), 'NOT_API_ENABLED');
         }
 
         //Auth
@@ -224,12 +224,12 @@ abstract class ApiController extends Controller
 
             //Login
             if ((Yii::$app->user->isGuest && $this->identityMode) || (!$this->identityMode && !$authorized)) {
-                $this->setError(Yii::t('futuretek/yii2-api/api', 'User is not logged in'), 'NOT_LOGGED_IN');
+                $this->setError(Yii::t('fts-yii2-api', 'User is not logged in'), 'NOT_LOGGED_IN');
             }
 
             //Permission
             if (!$this->identityMode && $this->_methodInfo['permission'] && !Yii::$app->user->can($this->_methodInfo['permission'])) {
-                $this->setError(Yii::t('futuretek/yii2-api/api', 'You have not permission to run this action'), 'ACCESS_DENIED');
+                $this->setError(Yii::t('fts-yii2-api', 'You have not permission to run this action'), 'ACCESS_DENIED');
             }
         }
 
@@ -243,7 +243,7 @@ abstract class ApiController extends Controller
                             $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                         } else {
                             $this->setError(
-                                Yii::t('futuretek/yii2-api/api',
+                                Yii::t('fts-yii2-api',
                                     'Parameter {param} is not valid (validator {validator})',
                                     ['param' => $paramName, 'validator' => $param['validate']]
                                 ),
@@ -252,7 +252,7 @@ abstract class ApiController extends Controller
                         }
                     } else {
                         $this->setError(
-                            Yii::t('futuretek/yii2-api/api', 'Validator {validator} method not found', ['validator' => $param['validate']]),
+                            Yii::t('fts-yii2-api', 'Validator {validator} method not found', ['validator' => $param['validate']]),
                             'VALIDATOR_NOT_FOUND'
                         );
                     }
@@ -261,7 +261,7 @@ abstract class ApiController extends Controller
                 }
             } else {
                 if ($param['required']) {
-                    $this->setError(Yii::t('futuretek/yii2-api/api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
+                    $this->setError(Yii::t('fts-yii2-api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
                 }
             }
         }
@@ -366,7 +366,7 @@ abstract class ApiController extends Controller
         //Method return type vs. phpDoc return type
         if (array_key_exists('type', $this->_methodInfo['return']) && $this->_methodInfo['return']['type'] !== $type) {
             $this->setError(
-                Yii::t('futuretek/yii2-api/api',
+                Yii::t('fts-yii2-api',
                     'Method return type ({t1}) differs from API return type ({t2})',
                     ['t1' => $type, 't2' => $this->_methodInfo['return']['type']]
                 ),
@@ -389,12 +389,12 @@ abstract class ApiController extends Controller
             case 'array':
                 break;
             default:
-                $this->setError(Yii::t('futuretek/yii2-api/api', 'Method return type ({type}) is not supported', ['type' => $type]), 'RETURN_TYPE_NOT_SUPPORTED');
+                $this->setError(Yii::t('fts-yii2-api', 'Method return type ({type}) is not supported', ['type' => $type]), 'RETURN_TYPE_NOT_SUPPORTED');
         }
 
         //Return value check
         if (!$result) {
-            $this->setError(Yii::t('futuretek/yii2-api/api', 'Method returned boolean false'), 'RETURN_VALUE_FALSE');
+            $this->setError(Yii::t('fts-yii2-api', 'Method returned boolean false'), 'RETURN_VALUE_FALSE');
         }
 
         //If not array, do not return anything
@@ -445,7 +445,7 @@ abstract class ApiController extends Controller
         $n = preg_match_all('/^@param\s+([\w\.\\\]+(\[\s*\])?)\s*?(\$[\w\.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
         if ($n !== count($params)) {
             $this->setError(
-                Yii::t('futuretek/yii2-api/api',
+                Yii::t('fts-yii2-api',
                     'Params count of the method {method} differs from phpDoc params count',
                     ['method' => $method->getShortName()]
                 ),
@@ -458,7 +458,7 @@ abstract class ApiController extends Controller
 
             if (!in_array('$' . $params[$i]->getName(), $matches[3], true)) {
                 $this->setError(
-                    Yii::t('futuretek/yii2-api/api',
+                    Yii::t('fts-yii2-api',
                         'Documented param {param} not found in the method {method} definition',
                         ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]
                     ),
