@@ -74,7 +74,7 @@ abstract class ApiController extends Controller
      */
     public $identityMode = true;
 
-    public function __construct($id, Module $module, array $config)
+    public function __construct($id, Module $module, array $config = [])
     {
         $this->enableCsrfValidation = false;
         parent::__construct($id, $module, $config);
