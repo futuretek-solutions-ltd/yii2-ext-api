@@ -147,7 +147,7 @@ abstract class ApiController extends Controller
      */
     public function hasErrors()
     {
-        return 0 === count($this->_errors);
+        return 0 !== count($this->_errors);
     }
 
     /**
