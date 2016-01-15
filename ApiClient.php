@@ -118,7 +118,7 @@ abstract class ApiClient
     {
         $response = $this->send('ping', []);
 
-        return ($response && array_key_exists('message', $response) && $response['message'] == 'pong');
+        return ($response && array_key_exists('message', $response) && $response['message'] === 'pong');
     }
 
     private function _setCurlOpt()
@@ -149,7 +149,7 @@ abstract class ApiClient
 
         if (!$response) {
             return null;
-        };
+        }
 
         $namespace = (new \ReflectionClass($class))->getNamespaceName();
 
