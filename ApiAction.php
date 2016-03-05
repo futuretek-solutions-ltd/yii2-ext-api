@@ -24,5 +24,5 @@ use yii\base\Action;
  */
 class ApiAction extends Action
 {
-    
+
 }

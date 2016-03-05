@@ -20,6 +20,9 @@ abstract class ApiClient
     private $_serverHost;
     private $_curl;
 
+    /**
+     * ApiClient constructor.
+     */
     public function __construct()
     {
         $this->_curl = curl_init();
@@ -58,12 +61,13 @@ abstract class ApiClient
      * @param string $method Method name in format (method-name)
      * @param array  $params Method input parameters
      *
-     * @return bool|array Method API response or boolean false on error
+     * @return array Method API response
+     * @throws \RuntimeException
      */
     public function send($method, array $params)
     {
         if (!$this->_serverHost) {
-            return false;
+            throw new \RuntimeException(Yii::t('fts-yii2-api', 'API URL not set.'));
         }
 
         $auth = $this->authorize();
@@ -74,7 +78,7 @@ abstract class ApiClient
 
         $request = json_encode($params);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return false;
+            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Error while encoding request to JSON.'));
         }
 
         $response = false;
@@ -90,17 +94,24 @@ abstract class ApiClient
         }
 
         if (!$response) {
-            return false;
+            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Remote API error.'));
         }
 
         $response = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            return false;
+            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Error while decoding response from JSON.'));
         }
 
         return $response;
     }
 
+    /**
+     * Inner method for sending API call
+     *
+     * @param $url
+     * @param $request
+     * @return mixed
+     */
     private function _innerSend($url, $request)
     {
         curl_setopt($this->_curl, CURLOPT_URL, $url);
@@ -113,14 +124,18 @@ abstract class ApiClient
      * Test API
      *
      * @return bool If API is OK
+     * @throws \RuntimeException
      */
     public function ping()
     {
         $response = $this->send('ping', []);
 
-        return ($response && array_key_exists('message', $response) && $response['message'] === 'pong');
+        return (is_array($response) && array_key_exists('message', $response) && $response['message'] === 'pong');
     }
 
+    /**
+     * Set CURL options
+     */
     private function _setCurlOpt()
     {
         curl_setopt($this->_curl, CURLOPT_POST, true);
@@ -133,6 +148,15 @@ abstract class ApiClient
         curl_setopt($this->_curl, CURLOPT_SSL_VERIFYPEER, false);
     }
 
+    /**
+     * Wrap API call
+     *
+     * @param mixed $class Class name
+     * @param string $function Function name
+     * @param array $arguments Function arguments
+     * @return ApiResult
+     * @throws \RuntimeException
+     */
     protected function apiCallEnumerator($class, $function, $arguments)
     {
         $inputParams = [];
@@ -146,10 +170,6 @@ abstract class ApiClient
             }
         }
         $response = $this->send(Tools::toCommaCase($function), $inputParams);
-
-        if (!$response) {
-            return null;
-        }
 
         $namespace = (new \ReflectionClass($class))->getNamespaceName();
 

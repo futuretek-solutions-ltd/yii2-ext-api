@@ -105,6 +105,7 @@ abstract class ApiController extends Controller
      * @param string $code Error code
      *
      * @return void
+     * @throws InvalidParamException
      */
     public function setError($message, $code = 'UNKNOWN')
     {
@@ -118,6 +119,7 @@ abstract class ApiController extends Controller
      * @param array $modelErrors Model errors from model's firstErrors property
      *
      * @return void
+     * @throws InvalidParamException
      */
     public function setModelErrors(array $modelErrors)
     {
@@ -170,6 +172,7 @@ abstract class ApiController extends Controller
      * @param Action $action Action object
      *
      * @return bool Continue with action execution
+     * @throws InvalidParamException
      */
     public function beforeAction($action)
     {
@@ -192,7 +195,7 @@ abstract class ApiController extends Controller
         } elseif ($action instanceof Action) {
             //External action
             $action->hasMethod('run') or $this->setError(Yii::t('fts-yii2-api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
-            $className = $action->className();
+            $className = $action::className();
             $classMethod = 'run';
         } else {
             //Wrong class parent
@@ -285,6 +288,7 @@ abstract class ApiController extends Controller
      * @throws InvalidRouteException if the requested action ID cannot be resolved into an action successfully.
      * @throws InvalidConfigException if the action class does not have a run() method
      * @throws Exception if the transaction is not active
+     * @throws InvalidParamException
      * @see createAction()
      */
     public function runAction($id, $params = [])
@@ -344,6 +348,7 @@ abstract class ApiController extends Controller
      *
      * @return mixed
      * @throws Exception if the transaction is not active
+     * @throws InvalidParamException
      */
     public function afterAction($action, $result)
     {
@@ -416,6 +421,7 @@ abstract class ApiController extends Controller
      * @param \ReflectionMethod $method Reflection method object
      *
      * @return array Reflection info or false on error
+     * @throws InvalidParamException
      */
     private function _examineMethod($method)
     {
@@ -470,7 +476,7 @@ abstract class ApiController extends Controller
                 'type' => $type,
                 'description' => $matches[4][$i],
                 'required' => !$params[$i]->isOptional(),
-                'default' => ($params[$i]->isDefaultValueAvailable() ? $params[$i]->getDefaultValue() : null),
+                'default' => $params[$i]->isDefaultValueAvailable() ? $params[$i]->getDefaultValue() : null,
             ];
 
             if (array_key_exists($i, $matches[5])) {
@@ -519,7 +525,7 @@ abstract class ApiController extends Controller
         }
 
         //Description
-        if (preg_match('/^\/\*+\s*([^@]*?)\n@/s', $comment, $matches)) {
+        if (preg_match('/^\/\*+\s*([^@]*?)\n@/', $comment, $matches)) {
             $result['description'] = trim($matches[1]);
         } else {
             $result['description'] = false;
@@ -537,6 +543,7 @@ abstract class ApiController extends Controller
      * @return array
      * @api
      * @no-auth
+     * @throws InvalidParamException
      */
     public function actionGenerateDefinition()
     {
@@ -547,6 +554,7 @@ abstract class ApiController extends Controller
      * Generate available API actions list
      *
      * @return array Available API actions
+     * @throws InvalidParamException
      */
     private function _innerGenerateAvailableActions()
     {
@@ -566,7 +574,7 @@ abstract class ApiController extends Controller
         //Inline actions
         $reflection = new \ReflectionClass($this);
         foreach ($reflection->getMethods() as $method) {
-            if ($method->isPublic() and substr($method->getName(), 0, 6) === 'action') {
+            if ($method->isPublic() and 0 === strpos($method->getName(), 'action')) {
                 $info = $this->_examineMethod($method);
                 if ($info['api']) {
                     $name = Tools::toCommaCase(substr($method->getName(), 6));
@@ -590,7 +598,7 @@ abstract class ApiController extends Controller
         $comment = preg_replace('/^\s*\**(\s*?$|\s*)/m', '', $comment);
 
         //Description
-        if (preg_match('/^\/\*+\s*([^@]*?)\n@/s', $comment, $matches)) {
+        if (preg_match('/^\/\*+\s*([^@]*?)\n@/', $comment, $matches)) {
             $result['description'] = trim($matches[1]);
         } else {
             $result['description'] = false;
@@ -640,6 +648,7 @@ abstract class ApiController extends Controller
      * Parse input request from JSON to variables
      *
      * @return void
+     * @throws InvalidParamException
      */
     private function _parseInput()
     {
@@ -661,6 +670,7 @@ abstract class ApiController extends Controller
      * @param array $response Response to render
      *
      * @return void
+     * @throws InvalidParamException
      */
     public function renderResponse(array $response = [])
     {
@@ -697,6 +707,7 @@ abstract class ApiController extends Controller
      *
      * @return void
      * @throws Exception if the transaction is not active
+     * @throws InvalidParamException
      */
     public function actionHandleError()
     {
@@ -776,6 +787,7 @@ abstract class ApiController extends Controller
      *
      * @return void
      * @throws ExitException if the application is in testing mode
+     * @throws InvalidParamException
      */
     public function actionGenerateConfluenceDocumentation()
     {
