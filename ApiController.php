@@ -688,7 +688,7 @@ abstract class ApiController extends Controller
             if (Yii::$app->db->transaction !== null) {
                 try {
                     Yii::$app->db->transaction->rollBack();
-                } catch (\Throwable $e) {
+                } catch (\Exception $e) {
                     $this->setError($e->getMessage(), $e->getCode());
                 }
             }
