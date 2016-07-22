@@ -14,6 +14,7 @@ use yii\base\InvalidParamException;
 use yii\base\InvalidRouteException;
 use yii\base\Module;
 use yii\db\Exception;
+use yii\helpers\ArrayHelper;
 use yii\helpers\Json;
 use yii\log\Logger;
 use yii\web\Controller;
@@ -74,6 +75,9 @@ abstract class ApiController extends Controller
      */
     public $identityMode = true;
 
+    /**
+     * @inheritdoc
+     */
     public function __construct($id, Module $module, array $config = [])
     {
         $this->enableCsrfValidation = false;
@@ -102,15 +106,15 @@ abstract class ApiController extends Controller
      * Set error message and stop executing request
      *
      * @param string $message Error message
-     * @param string $code Error code
      *
      * @return void
+     * @throws \futuretek\api\ApiException
      * @throws InvalidParamException
+     * @deprecated Throw exception instead.
      */
-    public function setError($message, $code = 'UNKNOWN')
+    public function setError($message)
     {
-        $this->_errors[] = ['message' => $message, 'code' => $code];
-        $this->renderResponse();
+        throw new ApiException($message);
     }
 
     /**
@@ -119,27 +123,31 @@ abstract class ApiController extends Controller
      * @param array $modelErrors Model errors from model's firstErrors property
      *
      * @return void
+     * @throws \futuretek\api\ApiException
      * @throws InvalidParamException
+     * @deprecated Throw ModelSaveException instead
      */
     public function setModelErrors(array $modelErrors)
     {
         foreach ($modelErrors as $field => $message) {
             $this->_errors[] = ['message' => $message, 'code' => 'MODEL_VALIDATION'];
         }
-        $this->renderResponse();
+
+        throw new ApiException(implode(', ', ArrayHelper::getColumn($this->_errors, 'message')));
     }
 
     /**
      * Set error message and continue executing request. Error will be still returned in the response
      *
      * @param string $message Error message
-     * @param string $code Error code
      *
      * @return void
+     * @throws \futuretek\api\ApiException
+     * @deprecated Warnings are not cool. Throw exception instead.
      */
-    public function setWarning($message, $code = 'UNKNOWN')
+    public function setWarning($message)
     {
-        $this->_errors[] = ['message' => $message, 'code' => $code];
+        throw new ApiException($message);
     }
 
     /**
@@ -172,6 +180,7 @@ abstract class ApiController extends Controller
      * @param Action $action Action object
      *
      * @return bool Continue with action execution
+     * @throws \futuretek\api\ApiException
      * @throws InvalidParamException
      */
     public function beforeAction($action)
@@ -182,11 +191,13 @@ abstract class ApiController extends Controller
 
         //Force SSL check
         if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
-            $this->setError(Yii::t('fts-yii2-api', 'Request is not secure (over HTTPS)'), 'REQUEST_NOT_SECURE');
+            throw new ApiException(Yii::t('fts-yii2-api', 'Request is not secure (over HTTPS)'));
         }
 
         //Request method check
-        Yii::$app->request->isPost or $this->setError(Yii::t('fts-yii2-api', 'Request method must be POST'), 'REQUEST_NOT_POST');
+        if (!Yii::$app->request->isPost) {
+            throw new ApiException(Yii::t('fts-yii2-api', 'Request method must be POST'));
+        }
 
         if ($action instanceof InlineAction) {
             //Inline action
@@ -194,31 +205,33 @@ abstract class ApiController extends Controller
             $classMethod = $action->actionMethod;
         } elseif ($action instanceof Action) {
             //External action
-            $action->hasMethod('run') or $this->setError(Yii::t('fts-yii2-api', 'Run method is not defined for this action'), 'NO_RUN_METHOD');
+            if (!$action->hasMethod('run')) {
+                throw new ApiException(Yii::t('fts-yii2-api', 'Run method is not defined for this action'));
+            }
             $className = $action::className();
             $classMethod = 'run';
         } else {
             //Wrong class parent
-            $className = '';
-            $classMethod = '';
-            $this->setError(Yii::t('fts-yii2-api', 'Method is not descendant of \base\Action'), 'METHOD_WRONG_PARENT');
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method is not descendant of \base\Action'));
         }
 
         //Get input from POST body
         $this->_parseInput();
 
         $reflection = new \ReflectionMethod($className, $classMethod);
-        $reflection->isPublic() or $this->setError(Yii::t('fts-yii2-api', 'Method is not public'), 'METHOD_NOT_PUBLIC');
+        if (!$reflection->isPublic()) {
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method is not public'));
+        }
 
         //Examine method
         $this->_methodInfo = $this->_examineMethod($reflection);
         if (!$this->_methodInfo) {
-            $this->setError(Yii::t('fts-yii2-api', 'Method has no phpDoc comment'), 'NO_PHPDOC');
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method has no phpDoc comment'));
         }
 
         //API tag
         if (!$this->_methodInfo['api']) {
-            $this->setError(Yii::t('fts-yii2-api', 'Method is not intended for use via API'), 'NOT_API_ENABLED');
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method is not intended for use via API'));
         }
 
         //Auth
@@ -227,44 +240,39 @@ abstract class ApiController extends Controller
 
             //Login
             if ((Yii::$app->user->isGuest && $this->identityMode) || (!$this->identityMode && !$authorized)) {
-                $this->setError(Yii::t('fts-yii2-api', 'User is not logged in'), 'NOT_LOGGED_IN');
+                throw new ApiException(Yii::t('fts-yii2-api', 'User is not logged in'));
             }
 
             //Permission
             if (!$this->identityMode && $this->_methodInfo['permission'] && !Yii::$app->user->can($this->_methodInfo['permission'])) {
-                $this->setError(Yii::t('fts-yii2-api', 'You have not permission to run this action'), 'ACCESS_DENIED');
+                throw new ApiException(Yii::t('fts-yii2-api', 'You have not permission to run this action'));
             }
         }
 
         //Validate input params
         foreach ($this->_methodInfo['params'] as $paramName => $param) {
-            if (array_key_exists($paramName, $this->_inputVars)) { //Input param exists
-                if (array_key_exists('validate', $param) && $param['validate']) { //Validator is set
-                    if (method_exists('\futuretek\shared\Validate', $param['validate'])) { // Validator method exists
+            if (array_key_exists($paramName, $this->_inputVars)) {
+                //Input param exists
+                if (array_key_exists('validate', $param) && $param['validate']) {
+                    //Validator is set
+                    if (method_exists('\futuretek\shared\Validate', $param['validate'])) {
+                        // Validator method exists
                         $validator = $param['validate'];
-                        if (Validate::$validator($this->_inputVars[$paramName])) { //Input param valid
+                        if (Validate::$validator($this->_inputVars[$paramName])) {
+                            //Input param valid
                             $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                         } else {
-                            $this->setError(
-                                Yii::t('fts-yii2-api',
-                                    'Parameter {param} is not valid (validator {validator})',
-                                    ['param' => $paramName, 'validator' => $param['validate']]
-                                ),
-                                'PARAM_NOT_VALID'
-                            );
+                            throw new ApiException(Yii::t('fts-yii2-api', 'Parameter {param} is not valid (validator {validator})', ['param' => $paramName, 'validator' => $param['validate']]));
                         }
                     } else {
-                        $this->setError(
-                            Yii::t('fts-yii2-api', 'Validator {validator} method not found', ['validator' => $param['validate']]),
-                            'VALIDATOR_NOT_FOUND'
-                        );
+                        throw new ApiException(Yii::t('fts-yii2-api', 'Validator {validator} method not found', ['validator' => $param['validate']]));
                     }
                 } else {
                     $this->actionParams[$paramName] = $this->_inputVars[$paramName];
                 }
             } else {
                 if ($param['required']) {
-                    $this->setError(Yii::t('fts-yii2-api', 'Input parameter {param} not found', ['param' => $paramName]), 'PARAM_NOT_FOUND');
+                    throw new ApiException(Yii::t('fts-yii2-api', 'Input parameter {param} not found', ['param' => $paramName]));
                 }
             }
         }
@@ -285,6 +293,7 @@ abstract class ApiController extends Controller
      * @param array $params the parameters (name-value pairs) to be passed to the action.
      *
      * @return mixed the result of the action.
+     * @throws \futuretek\api\ApiException
      * @throws InvalidRouteException if the requested action ID cannot be resolved into an action successfully.
      * @throws InvalidConfigException if the action class does not have a run() method
      * @throws Exception if the transaction is not active
@@ -347,6 +356,7 @@ abstract class ApiController extends Controller
      * @param mixed $result Action result
      *
      * @return mixed
+     * @throws \futuretek\api\ApiException
      * @throws Exception if the transaction is not active
      * @throws InvalidParamException
      */
@@ -370,13 +380,7 @@ abstract class ApiController extends Controller
 
         //Method return type vs. phpDoc return type
         if (array_key_exists('type', $this->_methodInfo['return']) && $this->_methodInfo['return']['type'] !== $type) {
-            $this->setError(
-                Yii::t('fts-yii2-api',
-                    'Method return type ({t1}) differs from API return type ({t2})',
-                    ['t1' => $type, 't2' => $this->_methodInfo['return']['type']]
-                ),
-                'RETURN_TYPE_MISMATCH'
-            );
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method return type ({t1}) differs from API return type ({t2})', ['t1' => $type, 't2' => $this->_methodInfo['return']['type']]));
         }
 
         //Method return type check
@@ -394,12 +398,12 @@ abstract class ApiController extends Controller
             case 'array':
                 break;
             default:
-                $this->setError(Yii::t('fts-yii2-api', 'Method return type ({type}) is not supported', ['type' => $type]), 'RETURN_TYPE_NOT_SUPPORTED');
+                throw new ApiException(Yii::t('fts-yii2-api', 'Method return type ({type}) is not supported', ['type' => $type]));
         }
 
         //Return value check
         if (!$result) {
-            $this->setError(Yii::t('fts-yii2-api', 'Method returned boolean false'), 'RETURN_VALUE_FALSE');
+            throw new ApiException(Yii::t('fts-yii2-api', 'Method returned boolean false'));
         }
 
         //If not array, do not return anything
@@ -420,7 +424,8 @@ abstract class ApiController extends Controller
      *
      * @param \ReflectionMethod $method Reflection method object
      *
-     * @return array Reflection info or false on error
+     * @return array|false Reflection info or false on error
+     * @throws \futuretek\api\ApiException
      * @throws InvalidParamException
      */
     private function _examineMethod($method)
@@ -448,28 +453,17 @@ abstract class ApiController extends Controller
         //Input params
         $result['params'] = [];
         $params = $method->getParameters();
-        $n = preg_match_all('/^@param\s+([\w\.\\\]+(\[\s*\])?)\s*?(\$[\w\.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
+        $n = preg_match_all('/^@param\s+([\w.\\\]+(\[\s*\])?)\s*?(\$[\w.\\\]+)\s*?(\S+.*?\S+)\s*?(\{.+\})?$/im', $comment, $matches);
         if ($n !== count($params)) {
-            $this->setError(
-                Yii::t('fts-yii2-api',
-                    'Params count of the method {method} differs from phpDoc params count',
-                    ['method' => $method->getShortName()]
-                ),
-                'PARAM_COUNT_MISMATCH'
-            );
+            throw new ApiException(Yii::t('fts-yii2-api', 'Params count of the method {method} differs from phpDoc params count', ['method' => $method->getShortName()]));
         }
 
+        /** @noinspection ForeachInvariantsInspection */
         for ($i = 0; $i < $n; ++$i) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1][$i]);
 
             if (!in_array('$' . $params[$i]->getName(), $matches[3], true)) {
-                $this->setError(
-                    Yii::t('fts-yii2-api',
-                        'Documented param {param} not found in the method {method} definition',
-                        ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]
-                    ),
-                    'PARAM_COUNT_MISMATCH'
-                );
+                throw new ApiException(Yii::t('fts-yii2-api', 'Documented param {param} not found in the method {method} definition', ['param' => $params[$i]->getName(), 'method' => $method->getShortName()]));
             }
 
             $result['params'][$params[$i]->getName()] = [
@@ -500,7 +494,7 @@ abstract class ApiController extends Controller
         }
 
         //Return
-        if (preg_match('/^@return\s+([\w\.\\\]+(\[\s*\])?)\s*?(\S.*)$/im', $comment, $matches)) {
+        if (preg_match('/^@return\s+([\w.\\\]+(\[\s*\])?)\s*?(\S.*)$/im', $comment, $matches)) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1]);
             $result['return']['type'] = $type;
             $result['return']['description'] = $matches[3];
@@ -508,7 +502,8 @@ abstract class ApiController extends Controller
 
         //Return-param
         $result['return-params'] = [];
-        $n = preg_match_all('/^@return-param\s+([\w\.\\\]+(\[\s*\])?)\s*?([\w\.\\\]+)\s*?(\S+.*?\S+)\s*?$/im', $comment, $matches);
+        $n = preg_match_all('/^@return-param\s+([\w.\\\]+(\[\s*\])?)\s*?([\w.\\\]+)\s*?(\S+.*?\S+)\s*?$/im', $comment, $matches);
+        /** @noinspection ForeachInvariantsInspection */
         for ($i = 0; $i < $n; ++$i) {
             $type = preg_replace('/\\\\+/', '\\', $matches[1][$i]);
             $result['return-params'][$matches[3][$i]] = [
@@ -541,9 +536,11 @@ abstract class ApiController extends Controller
      * Generate API methods definition list
      *
      * @return array
+     * @throws \futuretek\api\ApiException
      * @api
      * @no-auth
      * @throws InvalidParamException
+     * @throws \yii\db\Exception
      */
     public function actionGenerateDefinition()
     {
@@ -554,6 +551,7 @@ abstract class ApiController extends Controller
      * Generate available API actions list
      *
      * @return array Available API actions
+     * @throws \futuretek\api\ApiException
      * @throws InvalidParamException
      */
     private function _innerGenerateAvailableActions()
@@ -612,7 +610,7 @@ abstract class ApiController extends Controller
                 $comment = preg_replace('/^\s*\**(\s*?$|\s*)/m', '', $comment);
 
                 //Var
-                if (preg_match('/^@var\s+([\w\.\\\]+(\[\s*\])?)\s*?(\S.*)$/im', $comment, $matches)) {
+                if (preg_match('/^@var\s+([\w.\\\]+(\[\s*\])?)\s*?(\S.*)$/im', $comment, $matches)) {
                     $type = preg_replace('/\\\\+/', '\\', $matches[1]);
                     $result['properties'][$prop->getName()]['type'] = $type;
                     $result['properties'][$prop->getName()]['description'] = $matches[3];
@@ -655,12 +653,8 @@ abstract class ApiController extends Controller
         $postBody = file_get_contents('php://input');
 
         if ($postBody) {
-            try {
-                $json = Json::decode($postBody);
-                $this->_inputVars = $json;
-            } catch (InvalidParamException $e) {
-                $this->setError($e->getMessage(), 'JSON_ERROR');
-            }
+            $json = Json::decode($postBody);
+            $this->_inputVars = $json;
         }
     }
 
@@ -670,6 +664,7 @@ abstract class ApiController extends Controller
      * @param array $response Response to render
      *
      * @return void
+     * @throws \yii\db\Exception
      * @throws InvalidParamException
      */
     public function renderResponse(array $response = [])
@@ -686,20 +681,14 @@ abstract class ApiController extends Controller
 
             //Transaction rollback
             if (Yii::$app->db->transaction !== null) {
-                try {
-                    Yii::$app->db->transaction->rollBack();
-                } catch (\Exception $e) {
-                    $this->setError($e->getMessage(), $e->getCode());
-                }
+                Yii::$app->db->transaction->rollBack();
             }
         }
 
         $response['hasErrors'] = $this->hasErrors();
         $response['errors'] = $this->_errors;
 
-        echo Json::encode($response);
-
-        die();
+        die(Json::encode($response));
     }
 
     /**
@@ -774,9 +763,11 @@ abstract class ApiController extends Controller
         }
 
         $result = [];
-        $n = preg_match_all('/,\s*\'((?>[A-Z]+|_)+)\'\s*\)\;/m', $content, $matches);
-        for ($i = 0; $i < $n; ++$i) {
-            $result[] = trim($matches[1][$i], "'");
+        $n = preg_match_all('/,\s*\'((?>[A-Z]+|_)+)\'\s*\);/m', $content, $matches);
+        if ($n) {
+            foreach ($matches[1] as $match) {
+                $result[] = trim($match, "'");
+            }
         }
 
         return $result;
@@ -786,6 +777,7 @@ abstract class ApiController extends Controller
      * Generate API documentation in Confluence markup
      *
      * @return void
+     * @throws \futuretek\api\ApiException
      * @throws ExitException if the application is in testing mode
      * @throws InvalidParamException
      */

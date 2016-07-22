@@ -59,15 +59,15 @@ abstract class ApiClient
      * Send API request
      *
      * @param string $method Method name in format (method-name)
-     * @param array  $params Method input parameters
+     * @param array $params Method input parameters
      *
      * @return array Method API response
-     * @throws \RuntimeException
+     * @throws \futuretek\api\ApiException
      */
     public function send($method, array $params)
     {
         if (!$this->_serverHost) {
-            throw new \RuntimeException(Yii::t('fts-yii2-api', 'API URL not set.'));
+            throw new ApiException(Yii::t('fts-yii2-api', 'API URL not set.'));
         }
 
         $auth = $this->authorize();
@@ -78,7 +78,7 @@ abstract class ApiClient
 
         $request = json_encode($params);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Error while encoding request to JSON.'));
+            throw new ApiException(Yii::t('fts-yii2-api', 'Error while encoding request to JSON.'));
         }
 
         $response = false;
@@ -94,12 +94,12 @@ abstract class ApiClient
         }
 
         if (!$response) {
-            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Remote API error.'));
+            throw new ApiException(Yii::t('fts-yii2-api', 'Remote API error.'));
         }
 
         $response = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException(Yii::t('fts-yii2-api', 'Error while decoding response from JSON.'));
+            throw new ApiException(Yii::t('fts-yii2-api', 'Error while decoding response from JSON.'));
         }
 
         return $response;
@@ -124,7 +124,7 @@ abstract class ApiClient
      * Test API
      *
      * @return bool If API is OK
-     * @throws \RuntimeException
+     * @throws \futuretek\api\ApiException
      */
     public function ping()
     {
@@ -155,7 +155,7 @@ abstract class ApiClient
      * @param string $function Function name
      * @param array $arguments Function arguments
      * @return ApiResult
-     * @throws \RuntimeException
+     * @throws \futuretek\api\ApiException
      */
     protected function apiCallEnumerator($class, $function, $arguments)
     {
@@ -170,10 +170,10 @@ abstract class ApiClient
             }
         }
         $response = $this->send(Tools::toCommaCase($function), $inputParams);
-
         $namespace = (new \ReflectionClass($class))->getNamespaceName();
+        /** @var ApiResult $newInstance */
+        $newInstance = (new \ReflectionClass($namespace . '\\' . $function . 'Result'))->newInstanceArgs([$response]);
 
-        return (new \ReflectionClass($namespace . '\\' . $function . 'Result'))->newInstanceArgs([$response]);
+        return $newInstance;
     }
-
 }

@@ -128,9 +128,9 @@ Usage: `@return type description`
 Indicate method return value. If the return value is an array, you can define it by using [], eg. String[]
 
 **Remember:** API function should always (and I mean ALWAYS!) return associative array. If another type is returned, it will be treated like the function has no output.
-Additionaly if the function returns boolean false (or another data type that can be typed to false), the API call will result in general error message.
+Additionally if the function returns boolean false (or another data type that can be typed to false), the API call will result in general error message.
   
-If you want to express processing fail inside the method, you can use $this->setError() or $this->setWarning().
+If you want to express processing fail inside the method, you should throw an exception.
 
 ###@return-param
 
