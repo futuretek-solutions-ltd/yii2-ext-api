@@ -19,7 +19,7 @@ class ApiException extends Exception
      * @param string $file File in which the exception occurred
      * @param int $line Line in which the exception occurred
      */
-    public function __construct($message = '', $code = 0, \Exception $previous, $file = null, $line = null)
+    public function __construct($message = '', $code = 0, \Exception $previous = null, $file = null, $line = null)
     {
         \Exception::__construct($message, $code, $previous);
 
