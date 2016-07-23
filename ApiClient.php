@@ -19,12 +19,19 @@ abstract class ApiClient
 {
     private $_serverHost;
     private $_curl;
+    /**
+     * @var bool Exception mode. If set to true, all REMOTE API errors will be thrown as exceptions.
+     */
+    public $exceptionMode = false;
 
     /**
      * ApiClient constructor.
+     *
+     * @param bool $exceptionMode Exception mode. If set to true, all REMOTE API errors will be thrown as exceptions.
      */
-    public function __construct()
+    public function __construct($exceptionMode = false)
     {
+        $this->exceptionMode = $exceptionMode;
         $this->_curl = curl_init();
         $this->_setCurlOpt();
     }
@@ -100,6 +107,10 @@ abstract class ApiClient
         $response = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new ApiException(Yii::t('fts-yii2-api', 'Error while decoding response from JSON.'));
+        }
+
+        if ($this->exceptionMode && $response['hasErrors'] && 0 !== count($response['errors'])) {
+            throw new ApiException($response['errors'][0]['message'], 0, null, $response['errors'][0]['file'], $response['errors'][0]['line']);
         }
 
         return $response;
