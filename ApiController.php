@@ -76,6 +76,11 @@ abstract class ApiController extends Controller
     public $identityMode = true;
 
     /**
+     * @var ErrorHandler Custom error handler singleton
+     */
+    public static $errorHandler;
+
+    /**
      * @inheritdoc
      */
     public function __construct($id, Module $module, array $config = [])
@@ -88,6 +93,7 @@ abstract class ApiController extends Controller
      * Init method
      *
      * @return void
+     * @throws \yii\base\InvalidConfigException
      */
     public function init()
     {
@@ -99,7 +105,11 @@ abstract class ApiController extends Controller
 
         $this->defaultAction = 'generate-definition';
 
-        Yii::$app->errorHandler->errorAction = $this->uniqueId . '/handle-error';
+        if (self::$errorHandler === null) {
+            self::$errorHandler = new ErrorHandler(['errorAction' => $this->uniqueId . '/handle-error']);
+            \Yii::$app->set('errorHandler', self::$errorHandler);
+            self::$errorHandler->register();
+        }
     }
 
     /**
