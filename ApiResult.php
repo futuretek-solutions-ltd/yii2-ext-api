@@ -9,6 +9,7 @@
  */
 
 namespace futuretek\api;
+use yii\helpers\ArrayHelper;
 
 /**
  * Class ApiResult
@@ -42,4 +43,13 @@ class ApiResult
         }
     }
 
+    /**
+     * Get errors as a string
+     *
+     * @return string
+     */
+    public function getErrorString()
+    {
+        return $this->hasErrors ? implode(', ', ArrayHelper::getColumn($this->errors, 'message')) : '';
+    }
 }
