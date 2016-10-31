@@ -3,12 +3,12 @@ ext-api
 
 Yii2 JSON API.
 
-##Requirements
+## Requirements
 
 - Yii2
 - ext-shared-components
 
-##Installation
+## Installation
 
 Use composer and add the following line to your composer.json file:
 
@@ -16,7 +16,12 @@ Use composer and add the following line to your composer.json file:
 "futuretek/yii2-api": "*"
 ```
 
-##Usage
+## Changelog
+
+### v1.0.0
+* Initial release
+
+## Usage
 
 Setup the API in the init method of your controller:
 
@@ -79,31 +84,31 @@ public function behaviors()
 }
 ```
 
-##Built-in methods
+## Built-in methods
 
-###ping
+### ping
 
 Ping action intended mainly to test the API interface availability
 
-###generate-definition
+### generate-definition
 
 Generate API methods definition list
 
 This is the default action if API method is not specified
 
-###generate-confluence-documentation
+### generate-confluence-documentation
 
 Generate API documentation in Confluence markup
 
-##Allowed phpDoc tags
+## Allowed phpDoc tags
 
-###@param
+### @param
 
 Usage: `@param type $variable description {additional parameters}`
 
 Indicate input variable. If the input variable is an array, you can define it by using [], eg. String[]
 
-####Additional parameters 
+#### Additional parameters 
 
 Optionally, extra attributes can be defined for each @param tag by enclosing definitions into curly brackets and separated by comma like so:
 
@@ -121,7 +126,7 @@ Validator must be static method name from the Validate class.
 
 Usage: `{element=name|type|description, element=name|type, ...}`
 
-###@return
+### @return
 
 Usage: `@return type description`
 
@@ -132,32 +137,32 @@ Additionally if the function returns boolean false (or another data type that ca
   
 If you want to express processing fail inside the method, you should throw an exception.
 
-###@return-param
+### @return-param
 
 Usage: `@return-param type name description`
 
 All API methods must return Array, bool or void(null). In case of Array you can specify each array element with this tag.
 This is mainly to describe the method. No additional logic is bind to this tag.  
 
-###@api
+### @api
 
 Usage: `@api`
 
 Indicates that this method should be accessible via API interface. Methods without this tag are ignored.
 
-###@no-auth
+### @no-auth
 
 Usage: `@no-auth`
 
 Indicates that this method will be publicly accessible without user identification
 
-###@permission
+### @permission
 
 Usage: `@permission permissionName`
 
 Require specified RBAC permission to run action. If @no-auth is used, this tag will be ignored 
 
-###@transaction
+### @transaction
 
 Usage: `@transaction`
 
