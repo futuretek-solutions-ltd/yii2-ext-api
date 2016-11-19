@@ -200,7 +200,7 @@ abstract class ApiController extends Controller
         }
 
         //Force SSL check
-        if ($this->forceSecureConnection and !Yii::$app->request->isSecureConnection) {
+        if (!YII_ENV_TEST && $this->forceSecureConnection && !Yii::$app->request->isSecureConnection) {
             throw new ApiException(Yii::t('fts-yii2-api', 'Request is not secure (over HTTPS)'));
         }
 
