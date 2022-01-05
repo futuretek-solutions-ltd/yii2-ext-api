@@ -3,33 +3,22 @@
     "description": "API used in FTS.",
     "keywords": ["extension", "api", "json", "yii"],
     "type": "yii2-extension",
-    "license": "proprietary",
-    "homepage": "http://www.futuretek.cz/",
+    "license": "Apache-2.0",
+    "homepage": "https://www.futuretek.cz/",
     "authors": [
         {
             "name": "Lukas Cerny",
             "email": "lukas.cerny@futuretek.cz",
-            "homepage": "http://www.futuretek.cz",
+            "homepage": "https://www.futuretek.cz",
             "role": "Developer"
         }
     ],
-    "support": {
-        "issues": "https://jira.futuretek.cz/browse/YII",
-        "wiki": "https://doc.futuretek.cz/display/YII",
-        "source": "https://git.futuretek.cz/projects/YII/repos/ext-api/browse"
-    },
     "require": {
         "php": ">=5.4.0",
         "yiisoft/yii2": "^2.0.0",
         "futuretek/yii2-shared": "^1.0.0",
         "futuretek/yii2-yii-shared": "^1.0.0"
     },
-    "repositories": [
-        {
-            "url": "https://composer.futuretek.cz/repo/private/",
-            "type": "composer"
-        }
-    ],
     "autoload": {
         "psr-4": {
             "futuretek\\api\\": ""
