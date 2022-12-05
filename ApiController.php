@@ -195,6 +195,8 @@ abstract class ApiController extends Controller
      */
     public function beforeAction($action)
     {
+        parent::beforeAction($action);
+
         if (in_array($action->id, $this->_apiIgnoreMethods, true)) {
             return true;
         }
