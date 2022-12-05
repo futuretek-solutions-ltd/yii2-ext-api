@@ -195,8 +195,6 @@ abstract class ApiController extends Controller
      */
     public function beforeAction($action)
     {
-        parent::beforeAction($action);
-
         if (in_array($action->id, $this->_apiIgnoreMethods, true)) {
             return true;
         }
@@ -294,7 +292,7 @@ abstract class ApiController extends Controller
             Yii::$app->db->beginTransaction();
         }
 
-        return true;
+        return parent::beforeAction($action);
     }
 
     /**
