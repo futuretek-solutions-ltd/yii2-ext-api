@@ -719,7 +719,16 @@ abstract class ApiController extends Controller
 
         $category = Logger::LEVEL_ERROR;
 
-        if ($exception instanceof ErrorException) {
+        
+        if ($exception instanceof \yii\web\UnauthorizedHttpException) {
+            http_response_code(401);
+            $this->_errors[] = [
+                'code' => get_class($exception),
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+            ];
+        } else if ($exception instanceof ErrorException) {
             switch ($exception->getCode()) {
                 case E_WARNING:
                     $type = 'PHP warning';
